@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Student Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="navbar">
+    <h2>EVENTRA</h2>
+    <div class="nav-right">
+        <span>student@college.edu</span>
+        <span class="role-badge">STUDENT</span>
+        <span class="logout" onclick="logout()">Logout</span>
+    </div>
+</div>
+
+<div class="dashboard-layout">
+
+    <!-- LEFT CONTENT -->
+    <div class="main-content">
+
+        <div class="card">
+            <h3>Book a Hall</h3>
+            <input type="text" placeholder="Event Name">
+            <input type="text" placeholder="Department">
+            <select>
+                <option>Select Hall</option>
+                <option>Seminar Hall</option>
+                <option>Auditorium</option>
+            </select>
+            <input type="date">
+            <input type="time">
+            <input type="time">
+            <button class="btn">Submit Request</button>
+        </div>
+
+        <div class="card">
+            <h3>My Bookings</h3>
+            <table class="table">
+                <tr>
+                    <th>EVENT</th>
+                    <th>HALL</th>
+                    <th>DATE</th>
+                    <th>STATUS</th>
+                </tr>
+                <tr>
+                    <td>Workshop</td>
+                    <td>Seminar Hall</td>
+                    <td>2026-03-10</td>
+                    <td><span class="status pending">PENDING</span></td>
+                </tr>
+            </table>
+        </div>
+
+    </div>
+
+    <!-- RIGHT SIDEBAR CALENDAR -->
+    <div class="calendar-sidebar">
+        <div class="calendar-card">
+            <h3>Upcoming Events</h3>
+
+            <div class="calendar-header">
+                <button onclick="changeMonth(-1)">◀</button>
+                <span id="monthYear"></span>
+                <button onclick="changeMonth(1)">▶</button>
+            </div>
+
+            <div class="calendar-grid" id="calendar"></div>
+
+            <p class="calendar-note">
+                Highlighted dates have events.
+            </p>
+        </div>
+    </div>
+
+</div>
+
+<script>
+
+let currentDate = new Date();
+
+// Sample event dates (FORMAT: "YYYY-M-D")
+let events = {
+    "2026-2-4": true,
+    "2026-2-9": true,
+    "2026-2-10": true
+};
+
+function renderCalendar() {
+
+    const calendar = document.getElementById("calendar");
+    const monthYear = document.getElementById("monthYear");
+
+    calendar.style.opacity = "0"; // smooth fade
+
+    setTimeout(() => {
+
+        calendar.innerHTML = "";
+
+        const month = currentDate.getMonth();
+        const year = currentDate.getFullYear();
+
+        const months = [
+            "January","February","March","April","May","June",
+            "July","August","September","October","November","December"
+        ];
+
+        monthYear.innerText = months[month] + " " + year;
+
+        const firstDay = new Date(year, month, 1).getDay();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        const today = new Date();
+        const isCurrentMonth =
+            today.getMonth() === month && today.getFullYear() === year;
+
+        // Day names
+        const dayNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+        dayNames.forEach(day => {
+            let div = document.createElement("div");
+            div.innerText = day;
+            div.style.fontWeight = "600";
+            calendar.appendChild(div);
+        });
+
+        // Empty spaces
+        for (let i = 0; i < firstDay; i++) {
+            let empty = document.createElement("div");
+            empty.classList.add("empty");
+            calendar.appendChild(empty);
+        }
+
+        // Days
+        for (let day = 1; day <= daysInMonth; day++) {
+
+            let div = document.createElement("div");
+            div.innerText = day;
+
+            // Highlight event days
+            if (events[year + "-" + month + "-" + day]) {
+                div.classList.add("event-day");
+            }
+
+            // Highlight today
+            if (isCurrentMonth && day === today.getDate()) {
+                div.classList.add("today");
+            }
+
+            calendar.appendChild(div);
+        }
+
+        calendar.style.opacity = "1";
+
+    }, 150);
+}
+
+function changeMonth(direction) {
+    currentDate.setMonth(currentDate.getMonth() + direction);
+    renderCalendar();
+}
+
+function logout() {
+    window.location.href = "login.html";
+}
+
+renderCalendar();
+
+</script>
+
+</body>
+</html>

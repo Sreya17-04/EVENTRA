@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Eventra Login</title>
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Font Awesome for Eye Icon -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+
+<body class="login-body">
+
+<div class="login-card">
+
+    <h1 class="logo">EVENTRA</h1>
+    <p class="subtitle">Sign in to manage your events</p>
+
+    <form id="loginForm">
+
+        <label>Email Address</label>
+        <input type="email" id="email" placeholder="name@college.edu" required>
+
+        <label>Password</label>
+        <div class="password-wrapper">
+            <input type="password" id="password" placeholder="Enter password" required>
+            <i class="fa-solid fa-eye eye" id="toggleEye"></i>
+        </div>
+
+        <label>Your Role</label>
+        <select id="role" required>
+            <option value="">Select your role</option>
+            <option value="student">Student</option>
+            <option value="coordinator">Coordinator</option>
+            <option value="admin">Admin</option>
+        </select>
+
+        <button type="submit" class="login-btn">Sign In</button>
+
+    </form>
+
+    <hr>
+
+    <p class="forgot">Forgot password?</p>
+    <p class="signup">
+        Don’t have an account? <span>Sign up</span>
+    </p>
+
+</div>
+
+<script>
+// Password Eye Toggle
+document.getElementById("toggleEye").addEventListener("click", function () {
+    const password = document.getElementById("password");
+
+    if (password.type === "password") {
+        password.type = "text";
+        this.classList.replace("fa-eye", "fa-eye-slash");
+    } else {
+        password.type = "password";
+        this.classList.replace("fa-eye-slash", "fa-eye");
+    }
+});
+
+// Role-Based Redirect
+document.getElementById("loginForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+
+    const role = document.getElementById("role").value;
+
+    if (role === "student") {
+        window.location.href = "student_dashboard.html";
+    } 
+    else if (role === "coordinator") {
+        window.location.href = "coordinator_dashboard.html";
+    } 
+    else if (role === "admin") {
+        window.location.href = "admin_dashboard.html";
+    } 
+    else {
+        alert("Please select your role.");
+    }
+});
+</script>
+
+</body>
+</html>

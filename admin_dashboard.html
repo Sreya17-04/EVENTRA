@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="dashboard-body">
+
+<div class="navbar">
+    <h2>EVENTRA</h2>
+    <div class="nav-right">
+        <span>admin@college.edu</span>
+        <span class="role-badge">ADMIN</span>
+        <span class="logout" onclick="logout()">Logout</span>
+    </div>
+</div>
+
+<div class="dashboard-layout">
+
+    <!-- LEFT SIDE -->
+    <div class="main-content">
+
+        <!-- ANALYTICS CARDS -->
+        <div class="card">
+            <h3>Booking Analytics</h3>
+            <div style="display:flex; gap:20px; flex-wrap:wrap;">
+
+                <div class="analytics-box">
+                    <h4>Total</h4>
+                    <p id="totalCount">0</p>
+                </div>
+
+                <div class="analytics-box">
+                    <h4>Approved</h4>
+                    <p id="approvedCount">0</p>
+                </div>
+
+                <div class="analytics-box">
+                    <h4>Pending</h4>
+                    <p id="pendingCount">0</p>
+                </div>
+
+                <div class="analytics-box">
+                    <h4>Rejected</h4>
+                    <p id="rejectedCount">0</p>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- FINAL APPROVAL TABLE -->
+        <div class="card">
+            <h3>Coordinator Approved Requests</h3>
+
+            <table class="table">
+                <tr>
+                    <th>STUDENT</th>
+                    <th>EVENT</th>
+                    <th>HALL</th>
+                    <th>DATE</th>
+                    <th>STATUS</th>
+                    <th>FINAL ACTION</th>
+                </tr>
+
+                <!-- Flask will loop here -->
+                <tr>
+                    <td>Ananya</td>
+                    <td>Seminar</td>
+                    <td>Auditorium</td>
+                    <td>2026-03-12</td>
+                    <td><span class="status approved">APPROVED</span></td>
+                    <td>
+                        <button class="btn">Final Approve</button>
+                        <button class="btn reject-btn">Reject</button>
+                    </td>
+                </tr>
+
+            </table>
+        </div>
+
+    </div>
+
+    <!-- RIGHT SIDE CALENDAR -->
+    <div class="calendar-sidebar">
+        <div class="calendar-card">
+            <h3>Campus Event Overview</h3>
+
+            <div class="calendar-header">
+                <button onclick="changeMonth(-1)">◀</button>
+                <span id="monthYear"></span>
+                <button onclick="changeMonth(1)">▶</button>
+            </div>
+
+            <div class="calendar-grid" id="calendar"></div>
+
+            <p class="calendar-note">
+                🟢 Approved &nbsp; 🟡 Pending &nbsp; 🔴 Rejected
+            </p>
+        </div>
+    </div>
+
+</div>
+
+<script>
+
+let currentDate = new Date();
+
+/* Later fetch from Flask */
+let bookings = [
+    { date: "2026-03-12", status: "approved" },
+    { date: "2026-03-14", status: "pending" },
+    { date: "2026-03-18", status: "rejected" },
+    { date: "2026-03-12", status: "approved" } // simulate conflict
+];
+
+function calculateAnalytics() {
+
+    document.getElementById("totalCount").innerText = bookings.length;
+
+    document.getElementById("approvedCount").innerText =
+        bookings.filter(b => b.status === "approved").length;
+
+    document.getElementById("pendingCount").innerText =
+        bookings.filter(b => b.status === "pending").length;
+
+    document.getElementById("rejectedCount").innerText =
+        bookings.filter(b => b.status === "rejected").length;
+}
+
+function renderCalendar() {
+
+    const calendar = document.getElementById("calendar");
+    const monthYear = document.getElementById("monthYear");
+
+    calendar.innerHTML = "";
+
+    const month = currentDate.getMonth();
+    const year = currentDate.getFullYear();
+
+    const months = [
+        "January","February","March","April","May","June",
+        "July","August","September","October","November","December"
+    ];
+
+    monthYear.innerText = months[month] + " " + year;
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    const today = new Date();
+
+    const dayNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+    dayNames.forEach(day => {
+        let div = document.createElement("div");
+        div.innerText = day;
+        div.style.fontWeight = "600";
+        calendar.appendChild(div);
+    });
+
+    for (let i = 0; i < firstDay; i++) {
+        let empty = document.createElement("div");
+        calendar.appendChild(empty);
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+
+        let div = document.createElement("div");
+        div.innerText = day;
+
+        let fullDate = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+
+        let dayBookings = bookings.filter(b => b.date === fullDate);
+
+        if (dayBookings.length > 0) {
+
+            let statuses = dayBookings.map(b => b.status);
+
+            if (statuses.includes("approved")) {
+                div.classList.add("approved-day");
+            } else if (statuses.includes("pending")) {
+                div.classList.add("pending-day");
+            } else if (statuses.includes("rejected")) {
+                div.classList.add("rejected-day");
+            }
+
+            // conflict detection
+            let approvedCount = statuses.filter(s => s === "approved").length;
+            if (approvedCount > 1) {
+                div.style.border = "2px solid red";
+            }
+        }
+
+        if (day === today.getDate() &&
+            month === today.getMonth() &&
+            year === today.getFullYear()) {
+            div.classList.add("today");
+        }
+
+        calendar.appendChild(div);
+    }
+}
+
+function changeMonth(direction) {
+    currentDate.setMonth(currentDate.getMonth() + direction);
+    renderCalendar();
+}
+
+function logout() {
+    window.location.href = "login.html";
+}
+
+calculateAnalytics();
+renderCalendar();
+
+</script>
+
+</body>
+</html>
