@@ -100,39 +100,61 @@
     </div>
 
 </div>
-
 <script>
 
 let currentDate = new Date();
+let bookings = [];
 
-/* Later fetch from Flask */
-let bookings = [
-    { date: "2026-03-12", status: "approved" },
-    { date: "2026-03-14", status: "pending" },
-    { date: "2026-03-18", status: "rejected" },
-    { date: "2026-03-12", status: "approved" } // simulate conflict
-];
-
-function calculateAnalytics() {
-
-    document.getElementById("totalCount").innerText = bookings.length;
-
-    document.getElementById("approvedCount").innerText =
-        bookings.filter(b => b.status === "approved").length;
-
-    document.getElementById("pendingCount").innerText =
-        bookings.filter(b => b.status === "pending").length;
-
-    document.getElementById("rejectedCount").innerText =
-        bookings.filter(b => b.status === "rejected").length;
+/* AUTH CHECK */
+if(!localStorage.getItem("token")){
+    window.location.href="login.html";
 }
 
-function renderCalendar() {
+function getAuthHeader(){
+    return {
+        "Content-Type":"application/json",
+        "Authorization":"Bearer "+localStorage.getItem("token")
+    };
+}
+
+/* ================= LOAD ALL DATA ================= */
+
+fetch("http://127.0.0.1:5000/get_events",{
+    headers:getAuthHeader()
+})
+.then(res=>res.json())
+.then(data=>{
+    bookings = data;
+
+    calculateAnalytics();
+    renderCalendar();
+});
+
+/* ================= ANALYTICS ================= */
+
+function calculateAnalytics(){
+
+    document.getElementById("totalCount").innerText =
+        bookings.length;
+
+    document.getElementById("approvedCount").innerText =
+        bookings.filter(b=>b.status==="approved").length;
+
+    document.getElementById("pendingCount").innerText =
+        bookings.filter(b=>b.status==="pending").length;
+
+    document.getElementById("rejectedCount").innerText =
+        bookings.filter(b=>b.status==="rejected").length;
+}
+
+/* ================= CALENDAR ================= */
+
+function renderCalendar(){
 
     const calendar = document.getElementById("calendar");
     const monthYear = document.getElementById("monthYear");
 
-    calendar.innerHTML = "";
+    calendar.innerHTML="";
 
     const month = currentDate.getMonth();
     const year = currentDate.getFullYear();
@@ -142,57 +164,55 @@ function renderCalendar() {
         "July","August","September","October","November","December"
     ];
 
-    monthYear.innerText = months[month] + " " + year;
+    monthYear.innerText = months[month]+" "+year;
 
-    const firstDay = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const firstDay = new Date(year,month,1).getDay();
+    const daysInMonth = new Date(year,month+1,0).getDate();
 
     const today = new Date();
 
-    const dayNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-    dayNames.forEach(day => {
-        let div = document.createElement("div");
-        div.innerText = day;
-        div.style.fontWeight = "600";
+    const dayNames=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+    dayNames.forEach(d=>{
+        let div=document.createElement("div");
+        div.innerText=d;
+        div.style.fontWeight="600";
         calendar.appendChild(div);
     });
 
-    for (let i = 0; i < firstDay; i++) {
-        let empty = document.createElement("div");
-        calendar.appendChild(empty);
+    for(let i=0;i<firstDay;i++){
+        calendar.appendChild(document.createElement("div"));
     }
 
-    for (let day = 1; day <= daysInMonth; day++) {
+    for(let day=1; day<=daysInMonth; day++){
 
-        let div = document.createElement("div");
-        div.innerText = day;
+        let div=document.createElement("div");
+        div.innerText=day;
 
-        let fullDate = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+        let fullDate=
+        `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
 
-        let dayBookings = bookings.filter(b => b.date === fullDate);
+        let dayBookings = bookings.filter(b=>b.date===fullDate);
 
-        if (dayBookings.length > 0) {
+        if(dayBookings.length>0){
 
-            let statuses = dayBookings.map(b => b.status);
+            let statuses = dayBookings.map(b=>b.status);
 
-            if (statuses.includes("approved")) {
+            if(statuses.includes("approved")){
                 div.classList.add("approved-day");
-            } else if (statuses.includes("pending")) {
+            }
+            else if(statuses.includes("pending")){
                 div.classList.add("pending-day");
-            } else if (statuses.includes("rejected")) {
+            }
+            else if(statuses.includes("rejected")){
                 div.classList.add("rejected-day");
             }
 
-            // conflict detection
-            let approvedCount = statuses.filter(s => s === "approved").length;
-            if (approvedCount > 1) {
-                div.style.border = "2px solid red";
-            }
         }
 
-        if (day === today.getDate() &&
-            month === today.getMonth() &&
-            year === today.getFullYear()) {
+        if(day===today.getDate() &&
+           month===today.getMonth() &&
+           year===today.getFullYear()){
             div.classList.add("today");
         }
 
@@ -200,17 +220,23 @@ function renderCalendar() {
     }
 }
 
-function changeMonth(direction) {
-    currentDate.setMonth(currentDate.getMonth() + direction);
-    renderCalendar();
+function changeMonth(dir){
+    currentDate.setMonth(currentDate.getMonth()+dir);
+    fetch("http://127.0.0.1:5000/get_events",{
+        headers:getAuthHeader()
+    })
+    .then(res=>res.json())
+    .then(data=>{
+        bookings=data;
+        renderCalendar();
+        calculateAnalytics();
+    });
 }
 
-function logout() {
-    window.location.href = "login.html";
+function logout(){
+    localStorage.removeItem("token");
+    window.location.href="login.html";
 }
-
-calculateAnalytics();
-renderCalendar();
 
 </script>
 

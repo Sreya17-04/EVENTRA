@@ -74,107 +74,167 @@
 
 <script>
 
-let currentDate = new Date();
+let currentDate=new Date();
+let bookings=[];
 
-/* 
-Later this will come from Flask:
-fetch('/get-coordinator-bookings')
-*/
-
-let bookings = [
-    { date: "2026-03-10", status: "pending" },
-    { date: "2026-03-12", status: "approved" },
-    { date: "2026-03-18", status: "rejected" },
-    { date: "2026-03-12", status: "approved" } // duplicate to simulate conflict
-];
-
-function renderCalendar() {
-
-    const calendar = document.getElementById("calendar");
-    const monthYear = document.getElementById("monthYear");
-
-    calendar.innerHTML = "";
-
-    const month = currentDate.getMonth();
-    const year = currentDate.getFullYear();
-
-    const months = [
-        "January","February","March","April","May","June",
-        "July","August","September","October","November","December"
-    ];
-
-    monthYear.innerText = months[month] + " " + year;
-
-    const firstDay = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-    const today = new Date();
-
-    // Day names
-    const dayNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-    dayNames.forEach(day => {
-        let div = document.createElement("div");
-        div.innerText = day;
-        div.style.fontWeight = "600";
-        calendar.appendChild(div);
-    });
-
-    // Empty cells
-    for (let i = 0; i < firstDay; i++) {
-        let empty = document.createElement("div");
-        empty.classList.add("empty");
-        calendar.appendChild(empty);
-    }
-
-    for (let day = 1; day <= daysInMonth; day++) {
-
-        let div = document.createElement("div");
-        div.innerText = day;
-
-        let fullDate = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-
-        let dayBookings = bookings.filter(b => b.date === fullDate);
-
-        if (dayBookings.length > 0) {
-
-            let statuses = dayBookings.map(b => b.status);
-
-            if (statuses.includes("approved")) {
-                div.classList.add("approved-day");
-            } else if (statuses.includes("pending")) {
-                div.classList.add("pending-day");
-            } else if (statuses.includes("rejected")) {
-                div.classList.add("rejected-day");
-            }
-
-            // Conflict detection (2+ approved same day)
-            let approvedCount = statuses.filter(s => s === "approved").length;
-            if (approvedCount > 1) {
-                div.style.border = "2px solid red";
-            }
-        }
-
-        // Highlight today
-        if (day === today.getDate() &&
-            month === today.getMonth() &&
-            year === today.getFullYear()) {
-            div.classList.add("today");
-        }
-
-        calendar.appendChild(div);
-    }
+if(!localStorage.getItem("token")){
+window.location.href="login.html";
 }
 
-function changeMonth(direction) {
-    currentDate.setMonth(currentDate.getMonth() + direction);
-    renderCalendar();
+function getAuthHeader(){
+return{
+"Content-Type":"application/json",
+"Authorization":"Bearer "+localStorage.getItem("token")
+};
 }
 
-function logout() {
-    window.location.href = "login.html";
-}
+function loadEvents(){
 
+fetch("http://127.0.0.1:5000/get_events",{
+headers:getAuthHeader()
+})
+.then(res=>res.json())
+.then(data=>{
+
+bookings=data;
+
+renderPendingTable();
 renderCalendar();
+
+});
+
+}
+
+function renderPendingTable(){
+
+let table=document.querySelector(".table");
+
+table.innerHTML=`
+<tr>
+<th>STUDENT</th>
+<th>EVENT</th>
+<th>HALL</th>
+<th>DATE</th>
+<th>STATUS</th>
+<th>ACTION</th>
+</tr>
+`;
+
+bookings.filter(b=>b.status==="pending")
+.forEach(e=>{
+
+table.innerHTML+=`
+<tr>
+<td>${e.student_id}</td>
+<td>${e.title}</td>
+<td>${e.hall_id==1?"Seminar Hall":"Auditorium"}</td>
+<td>${e.date}</td>
+<td><span class="status pending">PENDING</span></td>
+<td>
+<button class="btn approve-btn"
+onclick="updateEventStatus(${e.id},'approved')">Approve</button>
+
+<button class="btn reject-btn"
+onclick="updateEventStatus(${e.id},'rejected')">Reject</button>
+</td>
+</tr>
+`;
+
+});
+
+}
+
+function updateEventStatus(id,status){
+
+fetch(`http://127.0.0.1:5000/approve_event/${id}`,{
+method:"POST",
+headers:getAuthHeader(),
+body:JSON.stringify({
+decision:status
+})
+})
+.then(res=>res.json())
+.then(()=>{
+alert("Updated Successfully");
+loadEvents();
+});
+
+}
+
+function renderCalendar(){
+
+const calendar=document.getElementById("calendar");
+const monthYear=document.getElementById("monthYear");
+
+calendar.innerHTML="";
+
+const month=currentDate.getMonth();
+const year=currentDate.getFullYear();
+
+const months=["January","February","March","April","May","June",
+"July","August","September","October","November","December"];
+
+monthYear.innerText=months[month]+" "+year;
+
+const firstDay=new Date(year,month,1).getDay();
+const daysInMonth=new Date(year,month+1,0).getDate();
+
+const today=new Date();
+
+const dayNames=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+dayNames.forEach(d=>{
+let div=document.createElement("div");
+div.innerText=d;
+div.style.fontWeight="600";
+calendar.appendChild(div);
+});
+
+for(let i=0;i<firstDay;i++){
+calendar.appendChild(document.createElement("div"));
+}
+
+for(let day=1; day<=daysInMonth; day++){
+
+let div=document.createElement("div");
+div.innerText=day;
+
+let fullDate=`${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+
+let dayBookings=bookings.filter(b=>b.date===fullDate);
+
+if(dayBookings.length>0){
+
+let statuses=dayBookings.map(b=>b.status);
+
+if(statuses.includes("approved")) div.classList.add("approved-day");
+if(statuses.includes("pending")) div.classList.add("pending-day");
+if(statuses.includes("rejected")) div.classList.add("rejected-day");
+
+}
+
+if(day===today.getDate() &&
+month===today.getMonth() &&
+year===today.getFullYear()){
+div.classList.add("today");
+}
+
+calendar.appendChild(div);
+}
+
+}
+
+function changeMonth(dir){
+currentDate.setMonth(currentDate.getMonth()+dir);
+loadEvents();
+}
+
+function logout(){
+localStorage.removeItem("token");
+window.location.href="login.html";
+}
+
+loadEvents();
 
 </script>
 
