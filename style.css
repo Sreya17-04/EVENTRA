@@ -347,6 +347,27 @@ input:focus, select:focus {
     text-align: center;
 }
 
+/* Calendar day colors */
+.approved-day {
+    background: #10b981 !important; /* green */
+    color: white;
+}
+
+.pending-day {
+    background: #f59e0b !important; /* yellow */
+    color: black;
+}
+
+.rejected-day {
+    background: #ef4444 !important; /* red */
+    color: white;
+}
+
+.today {
+    border: 2px solid #1d4ed8 !important;
+    font-weight: bold;
+}
+
 /* ===== ANIMATIONS ===== */
 @keyframes fadeInPage {
     from { opacity: 0; transform: translateY(8px); }

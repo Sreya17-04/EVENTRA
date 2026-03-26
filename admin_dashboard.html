@@ -17,10 +17,9 @@
 
 <div class="dashboard-layout">
 
-    <!-- LEFT SIDE -->
     <div class="main-content">
 
-        <!-- ANALYTICS CARDS -->
+        <!-- ANALYTICS -->
         <div class="card">
             <h3>Booking Analytics</h3>
             <div style="display:flex; gap:20px; flex-wrap:wrap;">
@@ -31,12 +30,12 @@
                 </div>
 
                 <div class="analytics-box">
-                    <h4>Approved</h4>
+                    <h4>Final Approved</h4>
                     <p id="approvedCount">0</p>
                 </div>
 
                 <div class="analytics-box">
-                    <h4>Pending</h4>
+                    <h4>Waiting Admin</h4>
                     <p id="pendingCount">0</p>
                 </div>
 
@@ -52,35 +51,18 @@
         <div class="card">
             <h3>Coordinator Approved Requests</h3>
 
-            <table class="table">
-                <tr>
-                    <th>STUDENT</th>
-                    <th>EVENT</th>
-                    <th>HALL</th>
-                    <th>DATE</th>
-                    <th>STATUS</th>
-                    <th>FINAL ACTION</th>
-                </tr>
+            <table class="table"></table>
+        </div>
 
-                <!-- Flask will loop here -->
-                <tr>
-                    <td>Ananya</td>
-                    <td>Seminar</td>
-                    <td>Auditorium</td>
-                    <td>2026-03-12</td>
-                    <td><span class="status approved">APPROVED</span></td>
-                    <td>
-                        <button class="btn">Final Approve</button>
-                        <button class="btn reject-btn">Reject</button>
-                    </td>
-                </tr>
-
-            </table>
+        <!-- APPROVAL HISTORY -->
+        <div class="card">
+            <h3>Recent Approval History</h3>
+            <div id="approvalHistory"></div>
         </div>
 
     </div>
 
-    <!-- RIGHT SIDE CALENDAR -->
+    <!-- CALENDAR -->
     <div class="calendar-sidebar">
         <div class="calendar-card">
             <h3>Campus Event Overview</h3>
@@ -94,125 +76,213 @@
             <div class="calendar-grid" id="calendar"></div>
 
             <p class="calendar-note">
-                🟢 Approved &nbsp; 🟡 Pending &nbsp; 🔴 Rejected
+                🟢 Final Approved &nbsp; 🟡 Waiting &nbsp; 🔴 Rejected
             </p>
         </div>
     </div>
 
 </div>
+
 <script>
 
 let currentDate = new Date();
 let bookings = [];
 
-/* AUTH CHECK */
-if(!localStorage.getItem("token")){
-    window.location.href="login.html";
+const BASE_URL = "http://127.0.0.1:5000";
+
+/* AUTH */
+if (!localStorage.getItem("token")) {
+    location.href = "login.html";
 }
 
-function getAuthHeader(){
+function getAuthHeader() {
     return {
-        "Content-Type":"application/json",
-        "Authorization":"Bearer "+localStorage.getItem("token")
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + localStorage.getItem("token")
     };
 }
 
-/* ================= LOAD ALL DATA ================= */
+function handle(res) {
+    if (res.status === 401) {
+        alert("Session expired");
+        localStorage.clear();
+        location.href = "login.html";
+        return null;
+    }
+    return res.json();
+}
 
-fetch("http://127.0.0.1:5000/get_events",{
-    headers:getAuthHeader()
-})
-.then(res=>res.json())
-.then(data=>{
-    bookings = data;
+/* ================= LOAD EVENTS ================= */
+function loadEvents() {
+    fetch(`${BASE_URL}/get_events`, {
+        headers: getAuthHeader()
+    })
+    .then(handle)
+    .then(data => {
 
-    calculateAnalytics();
-    renderCalendar();
-});
+        console.log("Admin Events:", data);
+
+        if (!data || !Array.isArray(data)) return;
+
+        bookings = data;
+        calculateAnalytics();
+        renderAdminTable();
+        renderCalendar();
+    })
+    .catch(err => console.error("Load Events Error:", err));
+}
 
 /* ================= ANALYTICS ================= */
-
-function calculateAnalytics(){
-
-    document.getElementById("totalCount").innerText =
-        bookings.length;
+function calculateAnalytics() {
+    document.getElementById("totalCount").innerText = bookings.length;
 
     document.getElementById("approvedCount").innerText =
-        bookings.filter(b=>b.status==="approved").length;
+        bookings.filter(b => b.status === "final_approved").length;
 
     document.getElementById("pendingCount").innerText =
-        bookings.filter(b=>b.status==="pending").length;
+        bookings.filter(b => b.status === "coord_approved").length;
 
     document.getElementById("rejectedCount").innerText =
-        bookings.filter(b=>b.status==="rejected").length;
+        bookings.filter(b => b.status === "rejected").length;
+}
+
+/* ================= TABLE ================= */
+function renderAdminTable() {
+
+    const table = document.querySelector(".table");
+
+    table.innerHTML = `
+    <tr>
+        <th>STUDENT</th>
+        <th>EVENT</th>
+        <th>HALL</th>
+        <th>DATE</th>
+        <th>ACTION</th>
+    </tr>`;
+
+    const pending = bookings.filter(e => e.status === "coord_approved");
+
+    pending.forEach(e => {
+        table.innerHTML += `
+        <tr>
+            <td>${e.student?.username || "-"}</td>
+            <td>${e.title}</td>
+            <td>${e.hall?.name || "-"}</td>
+            <td>${e.date}</td>
+            <td>
+                <button class="btn" onclick="finalApprove(${e.id})">Approve</button>
+                <button class="btn reject-btn" onclick="reject(${e.id})">Reject</button>
+            </td>
+        </tr>`;
+    });
+}
+
+/* ================= STATUS ================= */
+function finalApprove(id) {
+    updateStatus(id, "final_approved");
+}
+
+function reject(id) {
+    updateStatus(id, "rejected");
+}
+
+function updateStatus(id, status) {
+
+    const remarks = prompt("Remarks (optional):") || "";
+
+    fetch(`${BASE_URL}/approve_event/${id}`, {
+        method: "POST",
+        headers: getAuthHeader(),
+        body: JSON.stringify({
+            decision: status,
+            remarks: remarks
+        })
+    })
+    .then(handle)
+    .then(() => {
+        loadEvents();
+        loadApprovalHistory();
+    })
+    .catch(err => console.error("Update Error:", err));
+}
+
+/* ================= HISTORY ================= */
+function loadApprovalHistory() {
+
+    fetch(`${BASE_URL}/get_approval_history`, {
+        headers: getAuthHeader()
+    })
+    .then(handle)
+    .then(data => {
+
+        console.log("History:", data);
+
+        const div = document.getElementById("approvalHistory");
+        div.innerHTML = "";
+
+        if (!data || data.length === 0) {
+            div.innerHTML = "<p>No history</p>";
+            return;
+        }
+
+        data.forEach(h => {
+            div.innerHTML += `
+            <div class="history-item">
+                <b>${h.event_title}</b> - ${h.decision} by ${h.approver}
+                <br>${h.decision_time}
+                ${h.remarks ? `<br><i>${h.remarks}</i>` : ""}
+            </div>`;
+        });
+    })
+    .catch(err => console.error("History Error:", err));
 }
 
 /* ================= CALENDAR ================= */
-
-function renderCalendar(){
+function renderCalendar() {
 
     const calendar = document.getElementById("calendar");
     const monthYear = document.getElementById("monthYear");
 
-    calendar.innerHTML="";
+    calendar.innerHTML = "";
 
-    const month = currentDate.getMonth();
-    const year = currentDate.getFullYear();
+    const m = currentDate.getMonth();
+    const y = currentDate.getFullYear();
 
-    const months = [
-        "January","February","March","April","May","June",
-        "July","August","September","October","November","December"
-    ];
+    monthYear.innerText =
+        currentDate.toLocaleString("default", { month: "long", year: "numeric" });
 
-    monthYear.innerText = months[month]+" "+year;
-
-    const firstDay = new Date(year,month,1).getDay();
-    const daysInMonth = new Date(year,month+1,0).getDate();
-
+    const first = new Date(y, m, 1).getDay();
+    const days = new Date(y, m + 1, 0).getDate();
     const today = new Date();
 
-    const dayNames=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-
-    dayNames.forEach(d=>{
-        let div=document.createElement("div");
-        div.innerText=d;
-        div.style.fontWeight="600";
-        calendar.appendChild(div);
-    });
-
-    for(let i=0;i<firstDay;i++){
+    for (let i = 0; i < first; i++) {
         calendar.appendChild(document.createElement("div"));
     }
 
-    for(let day=1; day<=daysInMonth; day++){
+    for (let d = 1; d <= days; d++) {
 
-        let div=document.createElement("div");
-        div.innerText=day;
+        let div = document.createElement("div");
+        div.innerText = d;
 
-        let fullDate=
-        `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+        let full =
+            `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
 
-        let dayBookings = bookings.filter(b=>b.date===fullDate);
+        let dayBookings = bookings.filter(b => b.date === full);
 
-        if(dayBookings.length>0){
+        if (dayBookings.length > 0) {
+            let statuses = dayBookings.map(b => b.status);
 
-            let statuses = dayBookings.map(b=>b.status);
-
-            if(statuses.includes("approved")){
+            if (statuses.includes("final_approved"))
                 div.classList.add("approved-day");
-            }
-            else if(statuses.includes("pending")){
+            else if (statuses.includes("coord_approved"))
                 div.classList.add("pending-day");
-            }
-            else if(statuses.includes("rejected")){
+            else if (statuses.includes("rejected"))
                 div.classList.add("rejected-day");
-            }
-
         }
 
-        if(day===today.getDate() &&
-           month===today.getMonth() &&
-           year===today.getFullYear()){
+        if (d === today.getDate() &&
+            m === today.getMonth() &&
+            y === today.getFullYear()) {
             div.classList.add("today");
         }
 
@@ -220,23 +290,21 @@ function renderCalendar(){
     }
 }
 
-function changeMonth(dir){
-    currentDate.setMonth(currentDate.getMonth()+dir);
-    fetch("http://127.0.0.1:5000/get_events",{
-        headers:getAuthHeader()
-    })
-    .then(res=>res.json())
-    .then(data=>{
-        bookings=data;
-        renderCalendar();
-        calculateAnalytics();
-    });
+/* ================= NAV ================= */
+function changeMonth(x) {
+    currentDate.setMonth(currentDate.getMonth() + x);
+    renderCalendar();
 }
 
-function logout(){
-    localStorage.removeItem("token");
-    window.location.href="login.html";
+/* ================= LOGOUT ================= */
+function logout() {
+    localStorage.clear();
+    location.href = "login.html";
 }
+
+/* ================= INIT ================= */
+loadEvents();
+loadApprovalHistory();
 
 </script>
 

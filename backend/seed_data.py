@@ -12,7 +12,7 @@ with app.app_context():
 
         halls = [
             Hall(
-                name="Main Hall",
+                name="PTA Hall",
                 capacity=200,
                 location="Block A"
             ),

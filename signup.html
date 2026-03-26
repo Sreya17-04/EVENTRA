@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Eventra Sign Up</title>
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Font Awesome for Eye Icon -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+
+<body class="login-body">
+
+<div class="login-card">
+
+    <h1 class="logo">EVENTRA</h1>
+    <p class="subtitle">Create an account to submit hall booking requests</p>
+
+    <form id="signupForm">
+
+        <label>Username</label>
+        <input type="text" id="username" placeholder="Your name" required>
+
+        <label>Email Address</label>
+        <input type="email" id="email" placeholder="name@college.edu" required>
+
+        <label>Password</label>
+        <div class="password-wrapper">
+            <input type="password" id="password" placeholder="Enter password" required>
+            <i class="fa-solid fa-eye eye" id="toggleEye"></i>
+        </div>
+
+        <label>Your Role</label>
+        <select id="role" required>
+            <option value="">Select your role</option>
+            <option value="student">Student</option>
+            <option value="coordinator">Coordinator</option>
+            <option value="admin">Admin</option>
+        </select>
+
+        <button type="submit" class="login-btn">Sign Up</button>
+
+    </form>
+
+    <hr>
+
+    <p class="forgot" onclick="window.location.href='login.html'">Already have an account? Log in</p>
+
+</div>
+
+<script>
+const eyeIcon = document.getElementById("toggleEye");
+const passwordInput = document.getElementById("password");
+
+eyeIcon.addEventListener("click", () => {
+    const type = passwordInput.getAttribute("type") === "password" ? "text" : "password";
+    passwordInput.setAttribute("type", type);
+    eyeIcon.classList.toggle("fa-eye-slash");
+});
+
+document.getElementById("signupForm").addEventListener("submit", async function(e) {
+    e.preventDefault();
+
+    const username = document.getElementById("username").value;
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+    const role = document.getElementById("role").value;
+
+    try {
+        const response = await fetch("http://127.0.0.1:5000/register", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                username: username,
+                email: email,
+                password: password,
+                role: role
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.access_token) {
+            localStorage.setItem("token", data.access_token);
+            alert(data.message || "Registered successfully.");
+            // Redirect to respective dashboard based on role
+            if (role === "student") {
+                window.location.href = "student_dashboard.html";
+            } else if (role === "coordinator") {
+                window.location.href = "coordinator_dashboard.html";
+            } else if (role === "admin") {
+                window.location.href = "admin_dashboard.html";
+            } else {
+                window.location.href = "login.html"; // fallback
+            }
+        } else {
+            alert(data.message || "Registration failed.");
+        }
+    } catch (error) {
+        console.error("Error:", error);
+        alert("Cannot connect to server. Make sure Flask is running.");
+    }
+});
+</script>
+
+</body>
+</html>

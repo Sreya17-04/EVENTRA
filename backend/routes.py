@@ -1,8 +1,9 @@
 from flask import Blueprint, request, jsonify
-from models import Event, Approval, User
+from models import Event, Approval, User, Hall
 from database import db
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
+from sqlalchemy.orm import joinedload
 
 main_routes = Blueprint("main", __name__)
 
@@ -70,7 +71,17 @@ def approve_event(event_id):
     if not event:
         return jsonify({"message": "Event not found"}), 404
 
-    event.status = data["decision"]
+    if user.role == "coordinator":
+        if data["decision"] == "approved":
+            event.status = "coord_approved"
+        else:
+            event.status = "rejected"
+
+    elif user.role == "admin":
+        if data["decision"] == "approved":
+            event.status = "final_approved"
+        else:
+            event.status = "rejected"
 
     approval = Approval(
         event_id=event_id,
@@ -95,17 +106,127 @@ def get_events():
     user = User.query.get(user_id)
 
     if user.role == "student":
-        events = Event.query.filter_by(student_id=user_id).all()
+        events = Event.query.filter_by(student_id=user_id).options(joinedload(Event.hall)).all()
     else:
-        events = Event.query.all()
+        events = Event.query.options(joinedload(Event.hall), joinedload(Event.student)).all()
 
     return jsonify([
         {
             "id": e.id,
             "title": e.title,
+            "description": e.description,
             "date": str(e.date),
+            "start_time": str(e.start_time),
+            "end_time": str(e.end_time),
             "status": e.status,
-            "hall_id": e.hall_id
+            "hall": {
+                "id": e.hall.id,
+                "name": e.hall.name
+            },
+            "student": {
+                "id": e.student.id,
+                "username": e.student.username
+            } if user.role != "student" else None
         }
         for e in events
     ])
+
+
+# GET HALLS
+@main_routes.route("/get_halls", methods=["GET"])
+def get_halls():
+    halls = Hall.query.all()
+    return jsonify([
+        {
+            "id": h.id,
+            "name": h.name,
+            "capacity": h.capacity,
+            "location": h.location
+        }
+        for h in halls
+    ])
+
+
+# GET PENDING APPROVALS (for coordinators and admins)
+@main_routes.route("/get_pending_approvals", methods=["GET"])
+@jwt_required()
+def get_pending_approvals():
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    if user.role not in ["coordinator", "admin"]:
+        return jsonify({"message": "Not authorized"}), 403
+
+    # For coordinators: get events that are pending or coord_approved
+    # For admins: get coord_approved events
+    if user.role == "coordinator":
+        events = Event.query.filter(Event.status.in_(["pending", "coord_approved"])).all()
+    else:  # admin
+        events = Event.query.filter_by(status="coord_approved").all()
+
+    return jsonify([
+        {
+            "id": e.id,
+            "title": e.title,
+            "description": e.description,
+            "date": str(e.date),
+            "start_time": str(e.start_time),
+            "end_time": str(e.end_time),
+            "status": e.status,
+            "hall": {
+                "id": e.hall.id,
+                "name": e.hall.name,
+                "location": e.hall.location
+            },
+            "student": {
+                "id": e.student.id,
+                "username": e.student.username,
+                "email": e.student.email
+            }
+        }
+        for e in events
+    ])
+
+
+@main_routes.route("/approval_history/<int:event_id>", methods=["GET"])
+@jwt_required()
+def get_approval_history(event_id):
+
+    approvals = Approval.query.filter_by(event_id=event_id).all()
+
+    result = []
+
+    for a in approvals:
+        user = User.query.get(a.approved_by)
+
+        result.append({
+            "role": user.role,
+            "decision": a.decision,
+            "remarks": a.remarks,
+            "time": str(a.decision_time)
+        })
+
+    return jsonify(result)
+
+
+# GET ANALYTICS (for admin)
+@main_routes.route("/get_analytics", methods=["GET"])
+@jwt_required()
+def get_analytics():
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    if user.role != "admin":
+        return jsonify({"message": "Not authorized"}), 403
+
+    total = Event.query.count()
+    approved = Event.query.filter_by(status="final_approved").count()
+    pending = Event.query.filter(Event.status.in_(["pending", "coord_approved"])).count()
+    rejected = Event.query.filter_by(status="rejected").count()
+
+    return jsonify({
+        "total": total,
+        "approved": approved,
+        "pending": pending,
+        "rejected": rejected
+    })

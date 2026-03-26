@@ -1,140 +1,155 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Student Dashboard</title>
-    <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<title>Student Dashboard</title>
+<link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
 <div class="navbar">
-    <h2>EVENTRA</h2>
-
-    <div class="nav-right">
-        <span>student@college.edu</span>
-        <span class="role-badge">STUDENT</span>
-        <span class="logout" onclick="logout()">Logout</span>
-    </div>
+<h2>EVENTRA</h2>
+<div class="nav-right">
+<span>student@college.edu</span>
+<span class="role-badge">STUDENT</span>
+<span class="logout" onclick="logout()">Logout</span>
+</div>
 </div>
 
 <div class="dashboard-layout">
 
 <div class="main-content">
 
-<!-- BOOK EVENT -->
 <div class="card">
 <h3>Book a Hall</h3>
 
-<input id="event_name" type="text" placeholder="Event Name">
-<input id="department" type="text" placeholder="Department">
+<input id="event_name" placeholder="Event Name">
+<input id="department" placeholder="Department">
 
-<select id="hall">
-<option value="1">Seminar Hall</option>
-<option value="2">Auditorium</option>
-</select>
+<select id="hall"></select>
 
 <input id="date" type="date">
 <input id="start_time" type="time">
 <input id="end_time" type="time">
 
-<button class="btn" onclick="createEvent()">Submit Request</button>
-
+<button class="btn" onclick="bookEvent()">Submit</button>
 </div>
 
-<!-- MY BOOKINGS -->
 <div class="card">
 <h3>My Bookings</h3>
-
-<table class="table">
-<tr>
-<th>EVENT</th>
-<th>HALL</th>
-<th>DATE</th>
-<th>STATUS</th>
-</tr>
-</table>
-
+<table class="table"></table>
 </div>
 
 </div>
 
-<!-- CALENDAR -->
 <div class="calendar-sidebar">
-
 <div class="calendar-card">
-
 <h3>Upcoming Events</h3>
-
 <div class="calendar-header">
 <button onclick="changeMonth(-1)">◀</button>
 <span id="monthYear"></span>
 <button onclick="changeMonth(1)">▶</button>
 </div>
-
 <div class="calendar-grid" id="calendar"></div>
-
+</div>
 </div>
 
 </div>
 
-</div>
 <script>
 
 let currentDate = new Date();
-let events = {};
+let halls = [];
 
-/* AUTH CHECK */
-if (!localStorage.getItem("token")) {
-    window.location.href = "login.html";
-}
+const BASE_URL = "http://127.0.0.1:5000";
+
+/* AUTH */
+if(!localStorage.getItem("token")) location.href="login.html";
 
 function getAuthHeader(){
-    return {
-        "Content-Type":"application/json",
-        "Authorization":"Bearer "+localStorage.getItem("token")
-    };
+return {
+"Content-Type":"application/json",
+"Authorization":"Bearer "+localStorage.getItem("token")
+};
 }
 
-/* ================= BOOK EVENT ================= */
+function handle(res){
+if(res.status===401){
+alert("Session expired");
+localStorage.clear();
+location.href="login.html";
+return null;
+}
+return res.json();
+}
 
+/* LOAD HALLS */
+function loadHalls(){
+fetch(`${BASE_URL}/get_halls`)
+.then(handle)
+.then(data=>{
+halls=data||[];
+console.log("Halls loaded:",halls);
+});
+}
+function loadHalls(){
+return fetch(`${BASE_URL}/get_halls`)
+.then(handle)
+.then(data=>{
+halls=data||[];
+
+let select=document.getElementById("hall");
+select.innerHTML="<option value=''>Select Hall</option>";
+
+halls.forEach(h=>{
+select.innerHTML+=`<option value="${h.id}">${h.name}</option>`;
+});
+});
+}
+
+/* BOOK EVENT */
 function bookEvent(){
 
-    const title = document.getElementById("event_name").value;
-    const department = document.getElementById("department").value;
-    const hallId = document.getElementById("hall").value;
-    const date = document.getElementById("date").value;
-    const startTime = document.getElementById("start_time").value;
-    const endTime = document.getElementById("end_time").value;
+let title = event_name.value.trim();
+let dept = department.value.trim();
+let hallId = hall.value;
+let dateVal = date.value;
+let start = start_time.value;
+let end = end_time.value;
 
-    fetch("http://127.0.0.1:5000/create_event",{
-        method:"POST",
-        headers:getAuthHeader(),
-        body:JSON.stringify({
-            title:title,
-            description:department,
-            hall_id:parseInt(hallId),
-            date:date,
-            start_time:startTime,
-            end_time:endTime
-        })
-    })
-    .then(res=>res.json())
-    .then(data=>{
-        alert(data.message);
-        loadMyBookings();
-        loadCalendarEvents();
-    });
+if(!title || !dept || !hallId || !dateVal || !start || !end){
+alert("Fill all fields");
+return;
 }
 
-/* ================= LOAD BOOKINGS ================= */
-
-function loadMyBookings(){
-
-fetch("http://127.0.0.1:5000/get_events",{
-headers:getAuthHeader()
+fetch(`${BASE_URL}/create_event`,{
+method:"POST",
+headers:getAuthHeader(),
+body:JSON.stringify({
+title:title,
+description:dept,
+hall_id:Number(hallId),
+date:dateVal,
+start_time:start,
+end_time:end
 })
-.then(res=>res.json())
+})
+.then(handle)
+.then(()=>{
+loadMyBookings();
+loadCalendar();
+})
+.catch(err=>console.error("Booking Error:",err));
+}
+
+/* BOOKINGS */
+function loadMyBookings(){
+fetch(`${BASE_URL}/get_events`,{headers:getAuthHeader()})
+.then(handle)
 .then(data=>{
+
+console.log("Bookings:",data);
 
 let table=document.querySelector(".table");
 
@@ -144,126 +159,92 @@ table.innerHTML=`
 <th>HALL</th>
 <th>DATE</th>
 <th>STATUS</th>
-</tr>
-`;
+</tr>`;
 
-data.forEach(e=>{
+(data || []).forEach(e => {
 
-let hallName = e.hall_id==1 ? "Seminar Hall" : "Auditorium";
+let hallName = e.hall?.name || "Unknown";
 
-table.innerHTML+=`
+table.innerHTML += `
 <tr>
 <td>${e.title}</td>
 <td>${hallName}</td>
 <td>${e.date}</td>
-<td>
-<span class="status ${e.status}">
-${e.status.toUpperCase()}
-</span>
-</td>
-</tr>
-`;
-
+<td>${e.status}</td>
+</tr>`;
 });
-
 });
-
 }
 
-/* ================= CALENDAR ================= */
-
-function loadCalendarEvents(){
-
-fetch("http://127.0.0.1:5000/get_events",{
-headers:getAuthHeader()
-})
-.then(res=>res.json())
+/* CALENDAR */
+function loadCalendar(){
+fetch(`${BASE_URL}/get_events`,{headers:getAuthHeader()})
+.then(handle)
 .then(data=>{
+
+console.log("Calendar Data:",data);
 
 events={};
 
-data.forEach(e=>{
-events[e.date]=e.status;
+(data||[]).forEach(e=>{
+if(!events[e.date]) events[e.date]=[];
+events[e.date].push(e.status);
 });
 
 renderCalendar();
-
 });
-
 }
 
 function renderCalendar(){
 
-const calendar=document.getElementById("calendar");
-const monthYear=document.getElementById("monthYear");
+let cal=document.getElementById("calendar");
+cal.innerHTML="";
 
-calendar.innerHTML="";
+let m=currentDate.getMonth();
+let y=currentDate.getFullYear();
 
-const month=currentDate.getMonth();
-const year=currentDate.getFullYear();
+monthYear.innerText=currentDate.toLocaleString("default",{month:"long",year:"numeric"});
 
-const months=[
-"January","February","March","April","May","June",
-"July","August","September","October","November","December"
-];
+let first=new Date(y,m,1).getDay();
+let days=new Date(y,m+1,0).getDate();
 
-monthYear.innerText=months[month]+" "+year;
+for(let i=0;i<first;i++){
+cal.appendChild(document.createElement("div"));
+}
 
-const firstDay=new Date(year,month,1).getDay();
-const daysInMonth=new Date(year,month+1,0).getDate();
+for(let d=1;d<=days;d++){
 
-const today=new Date();
-
-const dayNames=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-
-dayNames.forEach(d=>{
 let div=document.createElement("div");
 div.innerText=d;
-div.style.fontWeight="600";
-calendar.appendChild(div);
-});
 
-for(let i=0;i<firstDay;i++){
-calendar.appendChild(document.createElement("div"));
+let full=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+
+if(events[full]){
+if(events[full].includes("rejected")) div.classList.add("rejected-day");
+else if(events[full].includes("final_approved")) div.classList.add("approved-day");
+else div.classList.add("pending-day");
 }
 
-for(let day=1; day<=daysInMonth; day++){
-
-let div=document.createElement("div");
-div.innerText=day;
-
-let fullDate=`${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-
-if(events[fullDate]){
-div.classList.add(events[fullDate]+"-day");
+cal.appendChild(div);
+}
 }
 
-if(day===today.getDate() &&
-month===today.getMonth() &&
-year===today.getFullYear()){
-div.classList.add("today");
-}
-
-calendar.appendChild(div);
-}
-
-}
-
-function changeMonth(dir){
-currentDate.setMonth(currentDate.getMonth()+dir);
-renderCalendar();
-loadCalendarEvents();
+function changeMonth(x){
+currentDate.setMonth(currentDate.getMonth()+x);
+loadCalendar();
 }
 
 function logout(){
-localStorage.removeItem("token");
-window.location.href="login.html";
+localStorage.clear();
+location.href="login.html";
 }
 
+/* INIT — FIXED ORDER */
+loadHalls().then(()=>{
 loadMyBookings();
-loadCalendarEvents();
+loadCalendar();
+});
 
 </script>
-
 </body>
 </html>
